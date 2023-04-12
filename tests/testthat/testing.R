@@ -3,7 +3,6 @@ library(spfilteR)
 
 # load data
 data(fakedata)
-options(mc.cores=2)
 
 #####
 # getEVs()
