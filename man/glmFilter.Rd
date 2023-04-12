@@ -22,7 +22,9 @@ glmFilter(
   resid.type = "pearson",
   alpha = 0.25,
   tol = 0.1,
-  na.rm = TRUE
+  na.rm = TRUE,
+  seed = 123,
+  cores = parallelly::availableCores(omit = 1L)
 )
 }
 \arguments{
@@ -80,6 +82,10 @@ Griffith (2003)}
 autocorrelation at which the eigenvector selection terminates}
 
 \item{na.rm}{remove observations with missing values (TRUE/ FALSE)}
+
+\item{seed}{a numeric value between 1 and 7 digits to use as seed in EV selection}
+
+\item{cores}{a numeric value to specify how many cores should be used for EV selection}
 }
 \value{
 An object of class \code{spfilter} containing the following

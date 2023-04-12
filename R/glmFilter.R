@@ -49,6 +49,8 @@
 #' @param tol if \code{objfn = 'MI'}, determines the amount of remaining residual
 #' autocorrelation at which the eigenvector selection terminates
 #' @param na.rm remove observations with missing values (TRUE/ FALSE)
+#' @param seed a numeric value between 1 and 7 digits to use as seed in EV selection
+#' @param cores a numeric value to specify how many cores should be used for EV selection
 #'
 #' @return An object of class \code{spfilter} containing the following
 #' information:
@@ -164,6 +166,7 @@
 #' Analysis for Geographers. Englewood Cliffs, Prentice Hall.
 #'
 #' @importFrom stats pnorm dpois optim pt sd
+#' @import doParallel foreach iterators parallel doRNG parallelly
 #'
 #' @seealso \code{\link{lmFilter}}, \code{\link{getEVs}}, \code{\link{MI.resid}},
 #' \code{\link[stats]{optim}}
@@ -173,7 +176,7 @@
 glmFilter <- function(y, x = NULL, W, objfn = "AIC", MX = NULL, model, optim.method = "BFGS",
                       sig = .05, bonferroni = TRUE, positive = TRUE, ideal.setsize = FALSE,
                       min.reduction = .05, boot.MI = 100, resid.type = "pearson",
-                      alpha = .25, tol = .1, na.rm = TRUE) {
+                      alpha = .25, tol = .1, na.rm = TRUE, seed = 123, cores = parallelly::availableCores(omit = 1L)) {
 
   if (!is.null(MX)) {
     MX <- as.matrix(MX)
@@ -379,6 +382,12 @@ glmFilter <- function(y, x = NULL, W, objfn = "AIC", MX = NULL, model, optim.met
 
   #####
   # Search Algorithm:
+
+  # Register parallel backend
+  cl <- makeCluster(cores)
+  registerDoParallel(cl)
+  registerDoRNG(seed)
+
   # Stepwise Regression
   #####
   if (objfn == "all") {
@@ -388,7 +397,7 @@ glmFilter <- function(y, x = NULL, W, objfn = "AIC", MX = NULL, model, optim.met
     selset <- which(sel)
 
     # start forward selection
-    for (i in which(sel)) {
+    for(i in which(sel)) {
       if (objfn == "pMI") {
         if (abs(oldpMI) > sig) {
           break
@@ -396,19 +405,17 @@ glmFilter <- function(y, x = NULL, W, objfn = "AIC", MX = NULL, model, optim.met
       }
       ref <- Inf
       sid <- NULL
+      j <- NULL
 
       # identify next test eigenvector
-      for (j in selset) {
+      refs <- foreach(j = selset, .combine = 'rbind') %dopar% {
         xe <- cbind(x, evecs[, sel_id], evecs[, j])
-        test <- objfunc(y = y, xe = xe, n = n, W = W, objfn = objfn, model = model,
+        data.frame(test = objfunc(y = y, xe = xe, n = n, W = W, objfn = objfn, model = model,
                         optim.method = optim.method, boot.MI = boot.MI,
                         resid.type = resid.type, alternative = ifelse(dep == "positive",
-                                                                      "greater", "lower"))
-        if (test < ref) {
-          sid <- j
-          ref <- test
-        }
-      }
+                                                                      "greater", "lower")), j = j)}
+      sid <- refs[which.min(refs[,"test"]),"j"]
+      ref <- refs[which.min(refs[,"test"]),"test"]
 
       # stopping rules
       if (objfn %in% c("AIC", "BIC")) {
@@ -448,7 +455,10 @@ glmFilter <- function(y, x = NULL, W, objfn = "AIC", MX = NULL, model, optim.met
       # remove selected eigenvectors from candidate set
       selset <- selset[!(selset %in% sel_id)]
     } # end selection
+
   }
+
+  stopCluster(cl)
 
   # number of selected EVs
   count <- length(sel_id)
