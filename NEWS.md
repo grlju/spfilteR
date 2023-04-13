@@ -1,3 +1,9 @@
+# spfilteR 1.1.6
+
+- make EV selection parallel using the doFuture package
+
+---
+
 # spfilteR 1.1.5
 
 - fix minor bug in help pages
