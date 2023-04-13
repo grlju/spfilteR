@@ -20,11 +20,8 @@ BugReports: https://github.com/sjuhl/spfilteR/issues
 Depends: 
     R (>= 3.5.0)
 Imports: 
-    doParallel,
-    doRNG,
+    doFuture,
     foreach,
-    iterators,
-    parallelly,
     stats
 Suggests: 
     knitr,
