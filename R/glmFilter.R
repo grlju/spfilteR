@@ -9,7 +9,10 @@
 #' stepwise regression technique. Supported selection criteria are the minimization of
 #' residual autocorrelation, maximization of model fit, significance of residual
 #' autocorrelation, and the statistical significance of eigenvectors. Alternatively,
-#' all eigenvectors in the candidate set can be included as well.
+#' all eigenvectors in the candidate set can be included as well. Eigenvector selection uses the
+#' \code{\link[doFuture]{doFuture}} package to run in parallel.
+#' It is recommended to set the \code{\link[future]{plan}} as required,
+#' the estimation will run in sequential mode by default.
 #'
 #' @param y response variable
 #' @param x vector/ matrix of regressors (default = NULL)
@@ -49,8 +52,6 @@
 #' @param tol if \code{objfn = 'MI'}, determines the amount of remaining residual
 #' autocorrelation at which the eigenvector selection terminates
 #' @param na.rm remove observations with missing values (TRUE/ FALSE)
-#' @param seed a numeric value between 1 and 7 digits to use as seed in EV selection
-#' @param cores a numeric value to specify how many cores should be used for EV selection
 #'
 #' @return An object of class \code{spfilter} containing the following
 #' information:
@@ -166,7 +167,8 @@
 #' Analysis for Geographers. Englewood Cliffs, Prentice Hall.
 #'
 #' @importFrom stats pnorm dpois optim pt sd
-#' @import doParallel foreach iterators parallel doRNG parallelly
+#' @importFrom doFuture %dofuture%
+#' @importFrom foreach foreach
 #'
 #' @seealso \code{\link{lmFilter}}, \code{\link{getEVs}}, \code{\link{MI.resid}},
 #' \code{\link[stats]{optim}}
@@ -176,7 +178,7 @@
 glmFilter <- function(y, x = NULL, W, objfn = "AIC", MX = NULL, model, optim.method = "BFGS",
                       sig = .05, bonferroni = TRUE, positive = TRUE, ideal.setsize = FALSE,
                       min.reduction = .05, boot.MI = 100, resid.type = "pearson",
-                      alpha = .25, tol = .1, na.rm = TRUE, seed = 123, cores = parallelly::availableCores(omit = 1L)) {
+                      alpha = .25, tol = .1, na.rm = TRUE) {
 
   if (!is.null(MX)) {
     MX <- as.matrix(MX)
@@ -383,11 +385,6 @@ glmFilter <- function(y, x = NULL, W, objfn = "AIC", MX = NULL, model, optim.met
   #####
   # Search Algorithm:
 
-  # Register parallel backend
-  cl <- makeCluster(cores)
-  registerDoParallel(cl)
-  registerDoRNG(seed)
-
   # Stepwise Regression
   #####
   if (objfn == "all") {
@@ -408,7 +405,7 @@ glmFilter <- function(y, x = NULL, W, objfn = "AIC", MX = NULL, model, optim.met
       j <- NULL
 
       # identify next test eigenvector
-      refs <- foreach(j = selset, .combine = 'rbind') %dopar% {
+      refs <- foreach(j = selset, .combine = 'rbind', .options.future = list(seed = TRUE)) %dofuture% {
         xe <- cbind(x, evecs[, sel_id], evecs[, j])
         data.frame(test = objfunc(y = y, xe = xe, n = n, W = W, objfn = objfn, model = model,
                         optim.method = optim.method, boot.MI = boot.MI,
@@ -457,8 +454,6 @@ glmFilter <- function(y, x = NULL, W, objfn = "AIC", MX = NULL, model, optim.met
     } # end selection
 
   }
-
-  stopCluster(cl)
 
   # number of selected EVs
   count <- length(sel_id)
