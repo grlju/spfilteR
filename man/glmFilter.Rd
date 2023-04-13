@@ -22,9 +22,7 @@ glmFilter(
   resid.type = "pearson",
   alpha = 0.25,
   tol = 0.1,
-  na.rm = TRUE,
-  seed = 123,
-  cores = parallelly::availableCores(omit = 1L)
+  na.rm = TRUE
 )
 }
 \arguments{
@@ -82,10 +80,6 @@ Griffith (2003)}
 autocorrelation at which the eigenvector selection terminates}
 
 \item{na.rm}{remove observations with missing values (TRUE/ FALSE)}
-
-\item{seed}{a numeric value between 1 and 7 digits to use as seed in EV selection}
-
-\item{cores}{a numeric value to specify how many cores should be used for EV selection}
 }
 \value{
 An object of class \code{spfilter} containing the following
@@ -131,7 +125,10 @@ maximum likelihood estimation (MLE). Eigenvectors are selected by an unsupervise
 stepwise regression technique. Supported selection criteria are the minimization of
 residual autocorrelation, maximization of model fit, significance of residual
 autocorrelation, and the statistical significance of eigenvectors. Alternatively,
-all eigenvectors in the candidate set can be included as well.
+all eigenvectors in the candidate set can be included as well. Eigenvector selection uses the
+\code{\link[doFuture]{doFuture}} package to run in parallel.
+It is recommended to set the \code{\link[future]{plan}} as required,
+the estimation will run in sequential mode by default.
 }
 \details{
 If \strong{W} is not symmetric, it gets symmetrized by
