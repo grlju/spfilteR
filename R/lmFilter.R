@@ -8,7 +8,10 @@
 #' technique. Supported selection criteria are the minimization of residual
 #' autocorrelation, maximization of model fit, significance of residual autocorrelation,
 #' and the statistical significance of eigenvectors. Alternatively, all eigenvectors in
-#' the candidate set can be included as well.
+#' the candidate set can be included as well. Eigenvector selection uses the
+#' \code{\link[doFuture]{doFuture}} package to run in parallel.
+#' It is recommended to set the \code{\link[future]{plan}} as required,
+#' the estimation will run in sequential mode by default.
 #'
 #' @param y response variable
 #' @param x vector/ matrix of regressors (default = NULL)
@@ -131,8 +134,10 @@
 #' pp. 985 - 999.
 #'
 #' @importFrom stats pt sd
+#' @importFrom doFuture %dofuture%
+#' @importFrom foreach foreach
 #'
-#' @seealso \code{\link{glmFilter}}, \code{\link{getEVs}}, \code{\link{MI.resid}}
+#' @seealso \code{\link{glmFilter}}, \code{\link{getEVs}}, \code{\link{MI.resid}},
 #'
 #' @export
 
@@ -323,17 +328,16 @@ lmFilter <- function(y, x = NULL, W, objfn = "MI", MX = NULL, sig = .05,
       }
       ref <- Inf
       sid <- NULL
+      j <- NULL
 
       # select candidate eigenvector
-      for (j in selset) {
+      refs <- foreach(j = selset, .combine = 'rbind', .options.future = list(seed = TRUE)) %dofuture% {
         xe <- cbind(x, evecs[, sel_id], evecs[, j])
-        test <- objfunc(y = y, xe = xe, n = n, W = W, objfn = objfn, boot.MI = boot.MI,
-                        alternative = ifelse(dep == "positive", "greater", "lower"))
-        if (test < ref) {
-          sid <- j
-          ref <- test
-        }
-      }
+        data.frame(test = objfunc(y = y, xe = xe, n = n, W = W, objfn = objfn, boot.MI = boot.MI,
+                                  alternative = ifelse(dep == "positive", "greater", "lower")), j = j)}
+
+        sid <- refs[which.min(refs[,"test"]),"j"]
+        ref <- refs[which.min(refs[,"test"]),"test"]
 
       # stopping rules
       if (objfn == "R2") {
