@@ -1,3 +1,4 @@
+=======
 # spfilteR 2.1.0
 
 - update vignette to include an example of the negative binomial model
@@ -9,6 +10,7 @@
 - improve the handling of missingness in `MI.resid()`
 - minor adjustments to helper functions
 - update tests
+- make EV selection parallel using the doFuture package
 
 ---
 

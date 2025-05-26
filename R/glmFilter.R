@@ -9,7 +9,10 @@
 #' stepwise regression technique. Supported selection criteria are the minimization of
 #' residual autocorrelation, maximization of model fit, significance of residual
 #' autocorrelation, and the statistical significance of eigenvectors. Alternatively,
-#' all eigenvectors in the candidate set can be included as well.
+#' all eigenvectors in the candidate set can be included as well. Eigenvector selection uses the
+#' \code{\link[doFuture]{doFuture}} package to run in parallel.
+#' It is recommended to set the \code{\link[future]{plan}} as required,
+#' the estimation will run in sequential mode by default.
 #'
 #' @param y response variable
 #' @param x vector/ matrix of regressors (default = NULL)
@@ -170,6 +173,8 @@
 #' Analysis for Geographers. Englewood Cliffs, Prentice Hall.
 #'
 #' @importFrom stats pnorm dpois optim pt sd dnbinom
+#' @importFrom doFuture %dofuture%
+#' @importFrom foreach foreach
 #'
 #' @seealso \code{\link{lmFilter}}, \code{\link{getEVs}}, \code{\link{MI.resid}},
 #' \code{\link[stats]{optim}}
@@ -410,6 +415,7 @@ glmFilter <- function(y, x = NULL, W, objfn = "AIC", MX = NULL, model, optim.met
 
   #####
   # Search Algorithm:
+
   # Stepwise Regression
   #####
   if (objfn == "all") {
@@ -419,7 +425,7 @@ glmFilter <- function(y, x = NULL, W, objfn = "AIC", MX = NULL, model, optim.met
     selset <- which(sel)
 
     # start forward selection
-    for (i in which(sel)) {
+    for(i in which(sel)) {
       if (objfn == "pMI") {
         if (abs(oldpMI) > sig) {
           break
@@ -427,19 +433,17 @@ glmFilter <- function(y, x = NULL, W, objfn = "AIC", MX = NULL, model, optim.met
       }
       ref <- Inf
       sid <- NULL
+      j <- NULL
 
       # identify next test eigenvector
-      for (j in selset) {
+      refs <- foreach(j = selset, .combine = 'rbind', .options.future = list(seed = TRUE)) %dofuture% {
         xe <- cbind(x, evecs[, sel_id], evecs[, j])
-        test <- objfunc(y = y, xe = xe, n = n, W = W, objfn = objfn, model = model,
+        data.frame(test = objfunc(y = y, xe = xe, n = n, W = W, objfn = objfn, model = model,
                         optim.method = optim.method, boot.MI = boot.MI,
                         resid.type = resid.type, alternative = ifelse(dep == "positive",
-                                                                      "greater", "lower"))
-        if (test < ref) {
-          sid <- j
-          ref <- test
-        }
-      }
+                                                                      "greater", "lower")), j = j)}
+      sid <- refs[which.min(refs[,"test"]),"j"]
+      ref <- refs[which.min(refs[,"test"]),"test"]
 
       # stopping rules
       if (objfn %in% c("AIC", "BIC")) {
@@ -479,6 +483,7 @@ glmFilter <- function(y, x = NULL, W, objfn = "AIC", MX = NULL, model, optim.met
       # remove selected eigenvectors from candidate set
       selset <- selset[!(selset %in% sel_id)]
     } # end selection
+
   }
 
   # number of selected EVs
