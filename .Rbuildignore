@@ -2,6 +2,7 @@
 ^\.Rproj\.user$
 ^\.travis\.yml$
 ^\.Rhistory
+^\.github$
 ^LICENSE\.md$
 ^README\.Rmd$
 ^docs$
@@ -11,3 +12,5 @@
 ^CRAN-SUBMISSION$
 ^\.positai$
 ^\.claude$
+^doc$
+^Meta$

@@ -19,13 +19,14 @@
 #' @param W spatial connectivity matrix
 #' @param objfn the objective function to be used for eigenvector
 #' selection. Possible criteria are: the maximization of model fit
-#' ('AIC' or 'BIC'), minimization of residual autocorrelation ('MI'),
+#' ('AIC', 'AICc', or 'BIC'), minimization of residual autocorrelation ('MI'),
 #' significance level of candidate eigenvectors ('p'), significance of residual spatial
 #' autocorrelation ('pMI'), or all eigenvectors in the candidate set ('all')
 #' @param MX covariates used to construct the projection matrix (default = NULL) - see
 #' Details
 #' @param model a character string indicating the type of model to be estimated.
-#' Currently, 'probit', 'logit', and 'poisson' are valid inputs
+#' Currently, 'probit', 'logit', 'poisson', and 'nb' (for negative binomial model)
+#' are valid inputs
 #' @param optim.method a character specifying the optimization method used by
 #' the \code{optim} function
 #' @param sig significance level to be used for eigenvector selection
@@ -38,14 +39,15 @@
 #' @param ideal.setsize if \code{positive = TRUE}, uses the formula proposed by
 #' Chun et al. (2016) to determine the ideal size of the candidate set
 #' (TRUE/ FALSE)
-#' @param min.reduction if \code{objfn} is either 'AIC' or 'BIC'. A value in the
-#' interval [0,1) that determines the minimum reduction in AIC/ BIC (relative to the
-#' current AIC/ BIC) a candidate eigenvector need to achieve in order to be selected
+#' @param min.reduction if \code{objfn} is 'AIC', 'AICc' or 'BIC'. A value in the
+#' interval [0,1) that determines the minimum reduction in the selected information
+#' criterion (relative to its current value) a candidate eigenvector needs to achieve
+#' in order to be selected
 #' @param boot.MI number of iterations used to estimate the variance of Moran's I
-#' (default = 100). Alternatively, if \code{boot.MI = NULL}, analytical results will
+#' (default is 100). Alternatively, if \code{boot.MI = NULL}, analytical results will
 #' be used
 #' @param resid.type character string specifying the residual type to be used.
-#' Options are 'raw', 'deviance', and 'pearson' (default)
+#' Options are 'raw', 'pearson', and 'deviance'
 #' @param alpha a value in (0,1] indicating the range of candidate eigenvectors
 #' according to their associated level of spatial autocorrelation, see e.g.,
 #' Griffith (2003)
@@ -60,7 +62,7 @@
 #' \item{\code{varcovar}}{estimated variance-covariance matrix}
 #' \item{\code{EV}}{a matrix containing the summary statistics of selected eigenvectors}
 #' \item{\code{selvecs}}{vector/ matrix of selected eigenvectors}
-#' \item{\code{evMI}}{Moran coefficient of all eigenvectors}
+#' \item{\code{evMI}}{Moran coefficient of eigenvectors}
 #' \item{\code{moran}}{residual autocorrelation in the initial and the
 #' filtered model}
 #' \item{\code{fit}}{adjusted R-squared of the initial and the filtered model}
@@ -84,7 +86,8 @@
 #' \item{\code{siglevel}}{if \code{objfn = 'p'} or \code{objfn = 'pMI'}: actual
 #' (unadjusted/ adjusted) significance level}
 #' \item{\code{resid.type}}{residual type ('raw', 'deviance', or 'pearson')}
-#' \item{\code{pseudoR2}}{McFadden's pseudo R-squared (filtered vs. unfiltered model)}
+#' \item{\code{pseudoR2}}{McFadden's (adjusted) pseudo R-squared (filtered vs.
+#' unfiltered model) based on the models' likelihood functions}
 #' }
 #' }
 #' }
@@ -111,6 +114,9 @@
 #' FALSE if eigenvectors are added to the model until the residuals exhibit no
 #' significant level of spatial autocorrelation (\code{objfn = 'pMI'}).
 #'
+#' For the negative binomial model, deviance residuals are currently not computed.
+#' The function sets \code{resid.type = 'pearson'} and prints a message to the console.
+#'
 #' @note If the condition number (\code{condnum}) suggests high levels of
 #' multicollinearity, eigenvectors can be sequentially removed from \code{selvecs}
 #' and the model can be re-estimated using the \code{glm} function in order to
@@ -124,7 +130,10 @@
 #' Chun (2014) notes that only a limited number of studies address the problem
 #' of measuring spatial autocorrelation in generalized linear model residuals.
 #' Consequently, eigenvector selection may be based on an objective function that
-#' maximizes model fit rather than minimizes residual spatial autocorrelation.
+#' maximizes model fit rather than a function that minimizes residual spatial
+#' autocorrelation, e.g., the corrected Akaike information criterion ('AICc')
+#' which includes a small-sample penalty to account for the tendency to choose
+#' overparameterized models.
 #'
 #' @examples
 #' data(fakedata)
@@ -146,7 +155,7 @@
 #' # logit model - AIC objective function
 #' y_logit <- fakedataset$indicator
 #' logit <- glmFilter(y = y_logit, x = NULL, W = W, objfn = "AIC", positive = FALSE,
-#' model = "logit", min.reduction = .05)
+#' model = "logit", min.reduction = .01)
 #' print(logit)
 #' summary(logit, EV = FALSE)
 #'
@@ -169,6 +178,7 @@
 #' @importFrom stats pnorm dpois optim pt sd
 #' @importFrom doFuture %dofuture%
 #' @importFrom foreach foreach
+#' @importFrom stats pnorm dpois optim pt sd dnbinom
 #'
 #' @seealso \code{\link{lmFilter}}, \code{\link{getEVs}}, \code{\link{MI.resid}},
 #' \code{\link[stats]{optim}}
@@ -181,29 +191,33 @@ glmFilter <- function(y, x = NULL, W, objfn = "AIC", MX = NULL, model, optim.met
                       alpha = .25, tol = .1, na.rm = TRUE) {
 
   if (!is.null(MX)) {
-    MX <- as.matrix(MX)
+    MX <- data.matrix(MX)
   }
   if (!is.null(x)) {
-    x <- as.matrix(x)
+    x <- data.matrix(x)
   }
-  if (!is.null(colnames(x))) {
-    nams <- colnames(x)
-  } else {
-    nams <- NULL
+  if (!is.null(x)) {
+    x <- data.matrix(x)
+    if (!is.null(colnames(x))) {
+      nams <- colnames(x)[colnames(x) != "1"]
+    } else {
+      nams <- NULL
+    }
+    x <- unname(x)
   }
 
   # missing values
   if (na.rm) {
     if (!is.null(x)) {
       miss <- apply(cbind(y, x), 1, anyNA)
-      x <- as.matrix(x[!miss,])
+      x <- data.matrix(x[!miss,])
     } else {
       miss <- is.na(y)
     }
     y <- y[!miss]
     W <- W[!miss, !miss]
     if (!is.null(MX)) {
-      MX[!miss,]
+      MX <- MX[!miss,]
     }
   }
 
@@ -214,13 +228,20 @@ glmFilter <- function(y, x = NULL, W, objfn = "AIC", MX = NULL, model, optim.met
   if (is.null(x)) {
     x <- as.matrix(rep(1, n))
   }
-  if (!isTRUE(all.equal(x[, 1], rep(1, n)))) {
+  if (!any(apply(x, 2, sd) == 0)) {
     x <- cbind(1, x)
   }
   if (!is.null(MX) && any(apply(MX, 2, sd) == 0)) {
     MX <- as.matrix(MX[, apply(MX, 2, sd) != 0])
   }
   nx <- ncol(x)
+
+  #####
+  # default change in future release
+  #####
+  if (resid.type == 'pearson') {
+    warning("Note: The default value of `resid.type` will change from 'pearson' to 'deviance' in a future release")
+  }
 
   #####
   # Input Checks
@@ -246,11 +267,11 @@ glmFilter <- function(y, x = NULL, W, objfn = "AIC", MX = NULL, model, optim.met
   if (any(class(W) != "matrix")) {
     W <- as.matrix(W)
   }
-  if (!(model %in% c("probit", "logit", "poisson"))) {
-    stop("'model' must be either 'probit', 'logit', or 'poisson'")
+  if (!(model %in% c("probit", "logit", "poisson", "nb"))) {
+    stop("'model' must be either 'probit', 'logit', 'poisson', or 'nb'")
   }
-  if (!(objfn %in% c("p", "MI", "pMI", "AIC", "BIC", "all"))) {
-    stop("Invalid argument: objfn must be one of 'p', 'MI','pMI, 'AIC', 'BIC', or 'all'")
+  if (!(objfn %in% c("p", "MI", "pMI", "AIC", "AICc", "BIC", "all"))) {
+    stop("Invalid argument: objfn must be one of 'p', 'MI','pMI, 'AIC', 'AICc', 'BIC', or 'all'")
   }
   if (!(resid.type %in% c("raw", "pearson", "deviance"))) {
     stop("Invalid argument: resid.type must be one of 'raw', 'pearson', or 'deviance'")
@@ -279,6 +300,17 @@ glmFilter <- function(y, x = NULL, W, objfn = "AIC", MX = NULL, model, optim.met
       mu <- exp(x %*% theta)
       #ll <- sum(y*log(mu) - mu)
       ll <- sum(dpois(y, lambda = mu, log = TRUE))
+    } else if (model == "nb") {
+      mu <- exp(x %*% theta[-length(theta)])
+      size <- theta[length(theta)]
+      if (size <= 0){
+        ll <- Inf
+      } else {
+        ll <- sum(dnbinom(y, size = size, mu = mu, log = TRUE))
+      }
+      # alternative parameterization for size
+      #size <- 1 / exp(theta[length(theta)])
+      #ll <- sum(dnbinom(y, size = size, mu = mu, log = TRUE))
     }
     # return negative log-likelihood
     return(-ll)
@@ -288,23 +320,25 @@ glmFilter <- function(y, x = NULL, W, objfn = "AIC", MX = NULL, model, optim.met
   objfunc <- function(y, xe, n, W, objfn, model, optim.method, boot.MI,
                       resid.type, alternative) {
     inits <- rep(0, ncol(xe))
+    if (model == "nb") inits <- c(inits, 1)
     o <- optim(par = inits, fn = loglik, x = xe, y = y, model = model,
                method = optim.method, hessian = TRUE)
+    if (model == "nb") {
+      size <- o$par[length(o$par)]
+    } else size <- NULL
     if (objfn == "p") {
       est <- o$par[ncol(xe)]
       se <- sqrt(diag(solve(o$hessian)))[ncol(xe)]
       test <- 2 * pt(abs(est / se), df = (n - ncol(xe)), lower.tail = FALSE) # p-value
-    } else if (objfn == "AIC") {
-      test <- getICs(negloglik = o$value, n = n, df = ncol(xe))$AIC
-    } else if (objfn == "BIC") {
-      test <- getICs(negloglik = o$value, n = n, df = ncol(xe))$BIC
+    } else if (objfn %in% c("AIC", "AICc", "BIC")) {
+      test <- getICs(negloglik = o$value, n = n, df = length(o$par))[objfn]
     } else if (objfn == "MI") {
       fitvals <- fittedval(x = xe, params = o$par, model = model)
-      resid <- residfun(y = y, fitvals = fitvals, model = model)[, resid.type]
+      resid <- residfun(y = y, fitvals = fitvals, size = size, model = model)[, resid.type]
       test <- abs(MI.resid(resid = resid, x = xe, W = W, boot = boot.MI)$zI)
     } else if (objfn == "pMI") {
       fitvals <- fittedval(x = xe, params = o$par, model = model)
-      resid <- residfun(y = y, fitvals = fitvals, model = model)[, resid.type]
+      resid <- residfun(y = y, fitvals = fitvals, size = size, model = model)[, resid.type]
       test <- -(MI.resid(resid = resid, x = xe, W = W, boot = boot.MI,
                          alternative = alternative)$pI)
     }
@@ -326,18 +360,20 @@ glmFilter <- function(y, x = NULL, W, objfn = "AIC", MX = NULL, model, optim.met
   # Nonspatial Regression
   #####
   inits <- rep(0, nx)
+  if (model == "nb") inits <- c(inits, 1)
   opt <- optim(par = inits, fn = loglik, x = x, y = y, model = model,
                method = optim.method, hessian = TRUE)
   coefs_init <- opt$par
-  se_init <- sqrt(diag(solve(opt$hessian)))
+  #se_init <- sqrt(diag(solve(opt$hessian)))
   ll_init <- opt$value
   ICs_init <- getICs(negloglik = ll_init, n = n, df = length(coefs_init))
   yhat_init <- fittedval(x = x, params = coefs_init, model = model)
-  resid_init <- residfun(y = y, fitvals = yhat_init, model = model)[, resid.type]
+  resid_init <- residfun(y = y, fitvals = yhat_init, size = coefs_init[length(opt$par)]
+                        ,model = model)[, resid.type]
   zMI_init <- MI.resid(resid = resid_init, x = x, W = W, boot = boot.MI)$zI
   if (objfn == "MI") {
     oldZMI <- abs(zMI_init)
-  } else if (objfn %in% c("AIC", "BIC")) {
+  } else if (objfn %in% c("AIC", "AICc", "BIC")) {
     IC <- ICs_init[, objfn]
     mindiff <- abs(IC * min.reduction)
   } else {
@@ -415,7 +451,7 @@ glmFilter <- function(y, x = NULL, W, objfn = "AIC", MX = NULL, model, optim.met
       ref <- refs[which.min(refs[,"test"]),"test"]
 
       # stopping rules
-      if (objfn %in% c("AIC", "BIC")) {
+      if (objfn %in% c("AIC", "AICc", "BIC")) {
         if (ref < IC & abs(IC - ref) >= mindiff) {
           IC <- ref
           sel_id <- c(sel_id, sid)
@@ -461,6 +497,7 @@ glmFilter <- function(y, x = NULL, W, objfn = "AIC", MX = NULL, model, optim.met
   # filtered regression
   xev <- cbind(x, evecs[, sel_id])
   inits <- rep(0, ncol(xev))
+  if (model == "nb") inits <- c(inits, 1)
   opt <- optim(par = inits, fn = loglik, x = xev, y = y, model = model,
                method = optim.method, hessian = TRUE)
   coefs_out <- opt$par
@@ -469,7 +506,8 @@ glmFilter <- function(y, x = NULL, W, objfn = "AIC", MX = NULL, model, optim.met
   ll_out <- opt$value
   ICs_out <- getICs(negloglik = ll_out, n = n, df = length(coefs_out))
   yhat_out <- fittedval(x = xev, params = coefs_out, model = model)
-  resid_out <- residfun(y = y, fitvals = yhat_out, model = model)[, resid.type]
+  resid_out <- residfun(y = y, fitvals = yhat_out, size = coefs_out[length(opt$par)]
+                        ,model = model)[, resid.type]
   MI_out <- MI.resid(resid = resid_out, x = xev, W = W, boot = boot.MI,
                      alternative = ifelse(dep == "positive", "greater", "lower"))
   MI_init <- MI.resid(resid = resid_init, x = x, W = W, boot = boot.MI,
@@ -483,12 +521,12 @@ glmFilter <- function(y, x = NULL, W, objfn = "AIC", MX = NULL, model, optim.met
   colnames(est) <- c("Estimate", "SE", "p-value")
   varcovar <- solve(opt$hessian)[1:nx, 1:nx]
   if (nx == 1) {
-    rownames(est) <- names(varcovar) <- "(Intercept)"
+    names(varcovar) <- rownames(est) <- "(Intercept)"
   } else {
     if (!is.null(nams)) {
       rownames(est) <- rownames(varcovar) <- colnames(varcovar) <- c("(Intercept)", nams)
     } else {
-      rownames(est) <- c("(Intercept)", paste0("beta_", 1:(nx - 1)))
+      rownames(est) <- c("(Intercept)", paste0("beta_", seq_len(nx-1)))
       rownames(varcovar) <- colnames(varcovar) <- rownames(est)
     }
   }
@@ -521,7 +559,7 @@ glmFilter <- function(y, x = NULL, W, objfn = "AIC", MX = NULL, model, optim.met
   # model fit
   fit <- rbind(c(-ll_init, ICs_init), c(-ll_out, ICs_out))
   rownames(fit) <- c("Initial", "Filtered")
-  colnames(fit) <- c("logL", "AIC", "BIC")
+  colnames(fit) <- c("logL", "AIC", "AICc", "BIC")
 
   # McFadden's pseudo-R2
   pRsqr <- pseudoR2(negloglik_n = ll_init, negloglik_f = ll_out, nev = count)

@@ -57,9 +57,9 @@ candsetsize <- function(npos, zMI) {
 #' @name residfun
 #' @noRd
 
-residfun <- function(y, fitvals, model) {
-  if (!(model %in% c("linear", "probit", "logit", "poisson"))) {
-    stop("'model' must be either 'linear', 'probit', 'logit', or 'poisson'")
+residfun <- function(y, fitvals, size = NULL, model) {
+  if (!(model %in% c("linear", "probit", "logit", "poisson", "nb"))) {
+    stop("'model' must be either 'linear', 'probit', 'logit', 'poisson', or 'nb'")
   }
   # raw residuals
   raw <- y - fitvals
@@ -73,6 +73,11 @@ residfun <- function(y, fitvals, model) {
     sign <- ifelse(y > fitvals, 1, -1)
     ratio <- ifelse(y == 0, 1, y / fitvals)
     deviance <- sign * sqrt(2 * (y * log(ratio) - (y - fitvals)))
+  } else if (model == "nb") {
+    pearson <- (y - fitvals) / sqrt((fitvals + (fitvals^2 / size)))
+    y_safe <- ifelse(y == 0, 1e-12, y) # avoids log(0)
+    devi <- 2 * (y_safe * log((y_safe * (size + fitvals)) / (fitvals * (size + y_safe)) ) + size * log( (size + fitvals) / (size + y_safe) ))
+    deviance <- sign(y - fitvals) * sqrt(devi)
   } else if (model == "linear") {
     pearson <- deviance <- raw
   }
@@ -87,7 +92,7 @@ residfun <- function(y, fitvals, model) {
 #' @noRd
 
 fittedval <- function(x, params, model) {
-  mu <- x %*% params
+  if(model != "nb") mu <- x %*% params
   if (model == "linear") {
     yhat <- mu
   } else if (model == "probit") {
@@ -95,6 +100,9 @@ fittedval <- function(x, params, model) {
   } else if (model == "logit") {
     yhat <- exp(mu) / (1 + exp(mu))
   } else if (model == "poisson") {
+    yhat <- exp(mu)
+  } else if (model == "nb"){
+    mu <- x %*% params[-length(params)]
     yhat <- exp(mu)
   }
   return(yhat)
@@ -124,8 +132,9 @@ conditionNumber <- function(evecs = NULL, round = 8) {
 
 getICs <- function(negloglik, n, df) {
   AIC <- 2 * negloglik + 2 * df
+  AICc <- AIC + (2 * df * (df + 1)) / (n - df - 1)
   BIC <- 2 * negloglik + log(n) * df
-  out <- data.frame(AIC, BIC)
+  out <- data.frame(AIC, AICc, BIC)
   return(out)
 }
 
@@ -137,7 +146,8 @@ getICs <- function(negloglik, n, df) {
 pseudoR2 <- function(negloglik_n, negloglik_f, nev) {
   R2 <- 1 - (-negloglik_n / -negloglik_f)
   adjR2 <- 1 - ((-negloglik_n - nev) / -negloglik_f)
-  return(R2)
+  out <- data.frame(R2, adjR2)
+  return(out)
 }
 
 
@@ -145,8 +155,60 @@ pseudoR2 <- function(negloglik_n, negloglik_f, nev) {
 #' @importFrom stats sd
 #' @noRd
 
-Zscore <- function(x) {
+Zscore <- function(x, na.rm = TRUE) {
   x <- as.matrix(x)
-  Z <- apply(x, 2, function(v) (v - mean(v)) / sd(v))
+  Z <- apply(x, 2, function(v) (v - mean(v, na.rm = na.rm)) / sd(v, na.rm = na.rm))
   return(Z)
+}
+
+
+#' @name soft_thresholding
+#' @noRd
+
+soft_thresholding <- function(z_cor, penalty_parameter) {
+  out <- sign(z_cor) * pmax(abs(z_cor) - penalty_parameter, 0)
+  return(out)
+}
+
+
+#' @name MI_lasso
+#' @noRd
+
+MI_lasso <- function(y, x, evecs, selset, zMI, n, maxit = 1000, tol = 1e-7) {
+  # regularization parameter
+  theta <- 1 / zMI^2 # suggested by Barde et al. (2025)
+
+  # coefficients
+  beta <- solve(crossprod(x), crossprod(x, y))
+  gamma <- rep(0, length(selset))
+  
+  # residuals
+  r <- y - x %*% beta - evecs[, selset, drop = FALSE] %*% gamma
+  
+  for (iter in seq_len(maxit)) {
+    beta_old <- beta
+    gamma_old <- gamma
+    
+    # update beta (unpenalized OLS step) & residuals
+    beta <- solve(crossprod(x), crossprod(x, y - evecs[, selset, drop = FALSE] %*% gamma))
+    r <- y - x %*% beta - evecs[, selset, drop = FALSE] %*% gamma
+    
+    # Update gamma (coordinate descent)
+    for (j in seq_along(selset)) {
+      sid <- selset[j]
+      r_j <- r + evecs[, sid] * gamma[j] # partial residual
+      z_j <- crossprod(evecs[, sid], r_j) # raw correlation / projection
+      gamma[j] <- soft_thresholding(z_j, theta)
+      r <- r_j - evecs[, sid] * gamma[j] # update residual
+    }
+    
+    # convergence check
+    if (max(abs(beta - beta_old)) < tol &&
+        max(abs(gamma - gamma_old)) < tol)
+      break
+  }
+  
+  sel_id <- selset[abs(gamma) > 1e-7]
+
+  return(sel_id)
 }
