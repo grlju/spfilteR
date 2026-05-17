@@ -1,3 +1,4 @@
+Package: spfilteR
 Type: Package
 Title: Semiparametric Spatial Filtering with Eigenvectors in (Generalized) Linear Models
 Version: 2.2.0

@@ -122,7 +122,10 @@ regression procedure or by a penalized regression approach. The stepwise procedu
 supports selection criteria based on the minimization of residual autocorrelation,
 maximization of model fit, significance of residual autocorrelation, and the
 statistical significance of eigenvectors. Alternatively, all eigenvectors in
-the candidate set can be included as well.
+the candidate set can be included as well.Eigenvector selection uses the
+\code{\link[doFuture]{doFuture}} package to run in parallel.
+It is recommended to set the \code{\link[future]{plan}} as required,
+the estimation will run in sequential mode by default.
 }
 \details{
 If \strong{W} is not symmetric, it gets symmetrized by
@@ -206,5 +209,5 @@ many controls and instruments. American Economic Review, 105 (5), pp.
 486 - 490.
 }
 \seealso{
-\code{\link{glmFilter}}, \code{\link{getEVs}}, \code{\link{MI.resid}}
+\code{\link{glmFilter}}, \code{\link{getEVs}}, \code{\link{MI.resid}},
 }
