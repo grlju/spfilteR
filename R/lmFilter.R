@@ -383,11 +383,11 @@ lmFilter <- function(y, x = NULL, W, objfn = "MI", MX = NULL, sig = .05,
       # select candidate eigenvector
       refs <- foreach(j = selset, .combine = 'rbind', .options.future = list(seed = TRUE)) %dofuture% {
         xe <- cbind(x, evecs[, sel_id], evecs[, j])
-        data.frame(test = objfunc(y = y, xe = xe, n = n, W = W, objfn = objfn, boot.MI = boot.MI,
-                                  alternative = ifelse(dep == "positive", "greater", "lower")), j = j)}
-
-        sid <- refs[which.min(refs[,"test"]),"j"]
-        ref <- refs[which.min(refs[,"test"]),"test"]
+        data.frame(test = as.numeric(objfunc(y = y, xe = xe, n = n, W = W, objfn = objfn, boot.MI = boot.MI,
+                                             alternative = ifelse(dep == "positive", "greater", "lower"))), j = j)
+      }
+      sid <- refs[which.min(refs[, "test"]), "j"]
+      ref <- refs[which.min(refs[, "test"]), "test"]
 
       # stopping rules
       if (objfn == "R2") {

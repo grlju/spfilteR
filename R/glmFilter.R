@@ -443,10 +443,10 @@ glmFilter <- function(y, x = NULL, W, objfn = "AIC", MX = NULL, model, optim.met
       # identify next test eigenvector
       refs <- foreach(j = selset, .combine = 'rbind', .options.future = list(seed = TRUE)) %dofuture% {
         xe <- cbind(x, evecs[, sel_id], evecs[, j])
-        data.frame(test = objfunc(y = y, xe = xe, n = n, W = W, objfn = objfn, model = model,
+        data.frame(test = as.numeric(objfunc(y = y, xe = xe, n = n, W = W, objfn = objfn, model = model,
                         optim.method = optim.method, boot.MI = boot.MI,
                         resid.type = resid.type, alternative = ifelse(dep == "positive",
-                                                                      "greater", "lower")), j = j)}
+                                                                      "greater", "lower"))), j = j)}
       sid <- refs[which.min(refs[,"test"]),"j"]
       ref <- refs[which.min(refs[,"test"]),"test"]
 
