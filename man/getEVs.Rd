@@ -5,13 +5,15 @@
 \title{Eigenfunction Decomposition of a (Transformed) Spatial Connectivity
 Matrix}
 \usage{
-getEVs(W, covars = NULL)
+getEVs(W, covars = NULL, moran = TRUE)
 }
 \arguments{
 \item{W}{spatial connectivity matrix}
 
 \item{covars}{vector/ matrix of regressors included in the construction
 of the projection matrix \emph{\strong{M}} - see Details}
+
+\item{moran}{logical should the Moran coefficient be computed. Default is TRUE.}
 }
 \value{
 A list containing the following objects:

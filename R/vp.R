@@ -162,6 +162,8 @@ vp <- function(y, x = NULL, evecs = NULL, msr = 100) {
   return(out)
 }
 
+#' @export
+
 print.vpart <- function(obj) {
   res <- data.frame(cbind(format(round(obj$adjR2, 7), nsmall = 7),
                           format(round(obj$R2, 7), nsmall = 7)),

@@ -9,3 +9,5 @@
 ^misc$
 ^CRAN-RELEASE$
 ^CRAN-SUBMISSION$
+^\.positai$
+^\.claude$

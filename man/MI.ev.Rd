@@ -17,6 +17,10 @@ eigenvectors associated with the supplied eigenvalues.
 }
 \description{
 Calculates the Moran coefficient for each eigenvector.
+
+\code{\link[future.apply]{future.apply}} package to run in parallel.
+It is recommended to set the \code{\link[future]{plan}} as required,
+the estimation will run in sequential mode by default.
 }
 \references{
 Le Gallo, Julie and Antonio Páez (2013): Using synthetic

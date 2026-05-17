@@ -246,7 +246,7 @@ lmFilter <- function(y, x = NULL, W, objfn = "MI", MX = NULL, sig = .05,
   # Eigenvectors and
   # Eigenvalues
   #####
-  eigs <- getEVs(W, covars = MX)
+  eigs <- getEVs(W, covars = MX, moran = FALSE)
   evecs <- eigs$vectors
   evals <- eigs$values
 

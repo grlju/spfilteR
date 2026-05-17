@@ -315,7 +315,7 @@ glmFilter <- function(y, x = NULL, W, objfn = "AIC", MX = NULL, model, optim.met
   # Eigenvectors and
   # Eigenvalues
   #####
-  eigs <- getEVs(W, covars = MX)
+  eigs <- getEVs(W, covars = MX, moran = FALSE)
   evecs <- eigs$vectors
   evals <- eigs$values
 

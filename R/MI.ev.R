@@ -4,6 +4,10 @@
 #'
 #' @description Calculates the Moran coefficient for each eigenvector.
 #'
+#' \code{\link[future.apply]{future.apply}} package to run in parallel.
+#' It is recommended to set the \code{\link[future]{plan}} as required,
+#' the estimation will run in sequential mode by default.
+#'
 #' @param W spatial connectivity matrix
 #' @param evals vector of eigenvalues
 #'
@@ -20,6 +24,8 @@
 #' of Moran's I. Environment and Planning A: Economy and Space, 27 (6):
 #' pp. 985 - 999.
 #'
+#' @importFrom future.apply future_vapply
+#'
 #' @seealso \code{\link{lmFilter}}, \code{\link{glmFilter}}, \code{\link{getEVs}},
 #' \code{\link{MI.sf}}
 #'
@@ -27,7 +33,7 @@
 
 MI.ev <- function(W, evals) {
   n <- nrow(W)
-  evMI <- vapply(evals, function(evals) n / crossprod(rep(1, n), W %*% rep(1, n)) * evals,
+  evMI <- future_vapply(evals, function(evals) n / crossprod(rep(1, n), W %*% rep(1, n)) * evals,
                  FUN.VALUE = numeric(1))
   return(evMI)
 }

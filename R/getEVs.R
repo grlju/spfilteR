@@ -12,6 +12,7 @@
 #' @param W spatial connectivity matrix
 #' @param covars vector/ matrix of regressors included in the construction
 #' of the projection matrix \emph{\strong{M}} - see Details
+#' @param moran logical should the Moran coefficient be computed. Default is TRUE.
 #'
 #' @return A list containing the following objects:
 #' \describe{
@@ -56,7 +57,7 @@
 #'
 #' @export
 
-getEVs <- function(W, covars = NULL) {
+getEVs <- function(W, covars = NULL, moran = TRUE) {
   n <- nrow(W)
   # symmetric connectivity matrix V
   # Note: if W is symmetric, V == W
@@ -81,10 +82,18 @@ getEVs <- function(W, covars = NULL) {
   eigs <- eigen(MVM, symmetric = TRUE)
 
   # Moran coefficient for eigenvectors
-  moran <- MI.ev(W = V, evals = eigs$values)
+  # can be slow so make it optional
+  if (isFALSE(moran)) {
+    # return
+    return(list(vectors = eigs$vectors,
+                values = eigs$values))
 
-  # return
-  return(list(vectors = eigs$vectors,
-              values = eigs$values,
-              moran = moran))
+  } else {
+    moran <- MI.ev(W = V, evals = eigs$values)
+
+    # return
+    return(list(vectors = eigs$vectors,
+                values = eigs$values,
+                moran = moran))
+  }
 }
