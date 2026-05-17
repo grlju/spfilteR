@@ -175,7 +175,6 @@
 #' Griffith, Daniel A. and Carl G. Amrhein (1997): Multivariate Statistical
 #' Analysis for Geographers. Englewood Cliffs, Prentice Hall.
 #'
-#' @importFrom stats pnorm dpois optim pt sd
 #' @importFrom doFuture %dofuture%
 #' @importFrom foreach foreach
 #' @importFrom stats pnorm dpois optim pt sd dnbinom

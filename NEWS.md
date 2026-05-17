@@ -23,6 +23,7 @@
 - improve the handling of missingness in `MI.resid()`
 - minor adjustments to helper functions
 - update tests
+- make EV selection parallel using the doFuture package
 
 ---
 
