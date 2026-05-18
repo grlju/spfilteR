@@ -1,29 +1,17 @@
-<<<<<<< HEAD
 Package: spfilteR
 Type: Package
 Title: Semiparametric Spatial Filtering with Eigenvectors in (Generalized) Linear Models
 Version: 2.2.0
-=======
-Type: Package
-=======
-Title: Semiparametric Spatial Filtering with Eigenvectors in (Generalized) Linear Models
-Version: 2.1.0
->>>>>>> cdfd8f251d410488324fcd3276b9f15d1d16d473
 Authors@R: c(
     person("Sebastian", "Juhl", , "sebastian.juhl@t-online.de", role = c("aut", "cre"),
            comment = c(ORCID = "0000-0002-7123-5398")),
     person("Grigorij", "Ljubownikow", , "g.ljubownikow@auckland.ac.nz", role = "ctb",
            comment = c(ORCID = "0000-0002-0335-6286"))
   )
-<<<<<<< HEAD
 Description: Tools to decompose (transformed) spatial connectivity matrices and perform 
     supervised or unsupervised semiparametric spatial filtering in a regression framework. 
     The package supports unsupervised spatial filtering in standard linear as well as some 
     generalized linear regression models.
-=======
-Description: Tools to decompose (transformed) spatial connectivity matrices and perform supervised or unsupervised semiparametric spatial filtering in a regression framework. The package supports unsupervised spatial filtering in standard linear as well as some generalized linear regression models.
-
->>>>>>> cdfd8f251d410488324fcd3276b9f15d1d16d473
 License: GPL-3
 URL: https://github.com/grlju/spfilteR
 BugReports: https://github.com/grlju/spfilteR/issues
@@ -42,9 +30,5 @@ VignetteBuilder:
     knitr
 Encoding: UTF-8
 LazyData: true
-<<<<<<< HEAD
 RoxygenNote: 7.3.2
-=======
-RoxygenNote: 7.2.3
 VignetteBuilder: knitr
->>>>>>> cdfd8f251d410488324fcd3276b9f15d1d16d473
