@@ -201,7 +201,7 @@ lmFilter <- function(y, x = NULL, W, objfn = "MI", MX = NULL, sig = .05,
     y <- y[!miss]
     W <- W[!miss, !miss]
     if (!is.null(MX)) {
-      MX <- MX[!miss,]
+      MX <- MX[!miss, , drop = FALSE]
     }
   }
 

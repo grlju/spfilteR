@@ -216,7 +216,7 @@ glmFilter <- function(y, x = NULL, W, objfn = "AIC", MX = NULL, model, optim.met
     y <- y[!miss]
     W <- W[!miss, !miss]
     if (!is.null(MX)) {
-      MX <- MX[!miss,]
+      MX <- MX[!miss, , drop = FALSE]
     }
   }
 
